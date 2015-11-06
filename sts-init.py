@@ -123,15 +123,15 @@ def handle_sts_from_response(response):
     if len(awsroles) > 1:
         i = 0
         print "NOTE: You have multiple roles - a profile will be created for each"
-
+        expires_utc = 0
         for awsrole in awsroles:
             profile ='saml-'+ str(i)
             print '[', profile, ']: ', awsrole.split(',')[0]
-            bind_assertion_to_role(assertion, awsrole, profile)
+            expires_utc = bind_assertion_to_role(assertion, awsrole, profile).credentials.expiration
             i += 1
         print '\n\n----------------------------------------------------------------'
         print 'Your new access key pairs have been stored in the AWS configuration file {0} under the saml-<i> profiles.'.format(expanduser("~") + awsconfigfile)
-        print 'Note that it will expire in 1 hour'
+        print 'Note they will expire at {0}.'.format(expires_utc)
         print 'After this time you may safely rerun this script to refresh your access key pair.'
         print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml-0 ec2 describe-instances).'
         print '----------------------------------------------------------------\n\n'
@@ -175,6 +175,7 @@ def bind_assertion_to_role(assertion, role, profile):
     # Write the updated config file
     with open(filename, 'w+') as configfile:
         config.write(configfile)
+    return token
 
 ##########################################################################
 def main():
