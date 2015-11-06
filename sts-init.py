@@ -19,6 +19,28 @@ from urlparse import urlparse, urlunparse
 from requests_ntlm import HttpNtlmAuth
 
 
+##########################################################################
+# Variables
+
+# region: The default AWS region that this script will connect
+# to for all API calls
+region = 'us-east-1'
+
+# output format: The AWS CLI output format that will be configured in the
+# saml profile (affects subsequent CLI calls)
+outputformat = 'json'
+
+# awsconfigfile: The file where this script will store the temp
+# credentials under the saml profile
+awsconfigfile = '/.aws/credentials'
+
+# SSL certificate verification: Whether or not strict certificate
+# verification is done, False should only be used for dev/test
+sslverification = True
+
+# idpentryurl: The initial URL that starts the authentication process.
+idpentryurl = 'https://adfs.commercehub.com/adfs/ls/IdpInitiatedSignOn.aspx?loginToRp=urn:amazon:webservices'
+
 def has_ticket():
     '''
     Checks to see if the user has a valid ticket.
@@ -54,6 +76,15 @@ def handle_sts_by_ntlm():
     response = session.get(idpentryurl, verify=sslverification, headers=headers)
 
     handle_sts_from_response(response)
+
+def handle_sts_by_kerberos():
+    # Initiate session handler
+    session = requests.Session()
+    # Programatically get the SAML assertion
+    headers = {'User-Agent': 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'}
+    response = session.get(idpentryurl, verify=sslverification, headers=headers, auth=HTTPKerberosAuth(mutual_authentication=OPTIONAL))
+    handle_sts_from_response(response)
+
 
 def handle_sts_from_response(response):
     soup = BeautifulSoup(response.text.decode('utf8'), "html.parser")
@@ -138,46 +169,16 @@ def handle_sts_from_response(response):
     with open(filename, 'w+') as configfile:
         config.write(configfile)
 
+    expires_utc = token.credentials.expiration
+
     # Give the user some basic info as to what has just happened
     print '\n\n----------------------------------------------------------------'
     print 'Your new access key pair has been stored in the AWS configuration file {0} under the saml profile.'.format(filename)
-    print 'Note that it will expire at {0}.'.format(token.credentials.expiration)
+    print 'Note that it will expire at {0}.'.format(expires_utc)
     print 'After this time you may safely rerun this script to refresh your access key pair.'
     print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances).'
     print '----------------------------------------------------------------\n\n'
 
-
-def handle_sts_by_kerberos():
-    # Initiate session handler
-    session = requests.Session()
-
-    # Programatically get the SAML assertion
-    headers = {'User-Agent': 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'}
-    response = session.get(idpentryurl, verify=sslverification, headers=headers, auth=HTTPKerberosAuth(mutual_authentication=OPTIONAL))
-    handle_sts_from_response(response)
-
-
-##########################################################################
-# Variables
-
-# region: The default AWS region that this script will connect
-# to for all API calls
-region = 'us-east-1'
-
-# output format: The AWS CLI output format that will be configured in the
-# saml profile (affects subsequent CLI calls)
-outputformat = 'json'
-
-# awsconfigfile: The file where this script will store the temp
-# credentials under the saml profile
-awsconfigfile = '/.aws/credentials'
-
-# SSL certificate verification: Whether or not strict certificate
-# verification is done, False should only be used for dev/test
-sslverification = True
-
-# idpentryurl: The initial URL that starts the authentication process.
-idpentryurl = 'https://adfs.commercehub.com/adfs/ls/IdpInitiatedSignOn.aspx?loginToRp=urn:amazon:webservices'
 
 ##########################################################################
 def main():
@@ -195,5 +196,9 @@ def main():
         else:
             print kinit_result[1]
             print "Ehh, sorry but that still didn't work. Bear with me while we go old school. 🚌"
-            handle_sts_by_ntlm()
+            try:
+                handle_sts_by_ntlm()
+            except:
+                print "All hope is lost. I hope your problem is something simple like being off network, but I don't know 😕"
+                raise
 main()
