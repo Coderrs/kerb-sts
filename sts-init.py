@@ -122,30 +122,35 @@ def handle_sts_from_response(response):
     print ""
     if len(awsroles) > 1:
         i = 0
-        print "Please choose the role you would like to assume:"
+        print "NOTE: You have multiple roles - a profile will be created for each"
+
         for awsrole in awsroles:
-            print '[', i, ']: ', awsrole.split(',')[0]
+            profile ='saml-'+ str(i)
+            print '[', profile, ']: ', awsrole.split(',')[0]
+            bind_assertion_to_role(assertion, awsrole, profile)
             i += 1
-
-        print "Selection: ",
-        selectedroleindex = raw_input()
-
-        # Basic sanity check of input
-        if int(selectedroleindex) > (len(awsroles) - 1):
-            print 'You selected an invalid role index, please try again'
-            sys.exit(0)
-
-        role_arn = awsroles[int(selectedroleindex)].split(',')[0]
-        principal_arn = awsroles[int(selectedroleindex)].split(',')[1]
+        print '\n\n----------------------------------------------------------------'
+        print 'Your new access key pairs have been stored in the AWS configuration file {0} under the saml-<i> profiles.'.format(expanduser("~") + awsconfigfile)
+        print 'Note that it will expire in 1 hour'
+        print 'After this time you may safely rerun this script to refresh your access key pair.'
+        print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml-0 ec2 describe-instances).'
+        print '----------------------------------------------------------------\n\n'
 
     else:
-        role_arn = awsroles[0].split(',')[0]
-        principal_arn = awsroles[0].split(',')[1]
+        bind_assertion_to_role(assertion, awsroles[0], 'saml')
+        print '\n\n----------------------------------------------------------------'
+        print 'Your new access key pair has been stored in the AWS configuration file {0} under the saml profile.'.format(expanduser("~") + awsconfigfile)
+        print 'Note that it will expire in 1 hour'
+        print 'After this time you may safely rerun this script to refresh your access key pair.'
+        print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances).'
+        print '----------------------------------------------------------------\n\n'
 
-    # Use the assertion to get an AWS STS token using Assume Role with SAML
+
+def bind_assertion_to_role(assertion, role, profile):
     conn = boto.sts.connect_to_region(region)
+    role_arn = role.split(',')[0]
+    principal_arn = role.split(',')[1]
     token = conn.assume_role_with_saml(role_arn, principal_arn, assertion)
-
     # Write the AWS STS token into the AWS credential file
     home = expanduser("~")
     filename = home + awsconfigfile
@@ -156,29 +161,20 @@ def handle_sts_from_response(response):
 
     # Put the credentials into a specific profile instead of clobbering
     # the default credentials
-    if not config.has_section('saml'):
-        config.add_section('saml')
+    if not config.has_section(profile):
+        config.add_section(profile)
 
-    config.set('saml', 'output', outputformat)
-    config.set('saml', 'region', region)
-    config.set('saml', 'aws_access_key_id', token.credentials.access_key)
-    config.set('saml', 'aws_secret_access_key', token.credentials.secret_key)
-    config.set('saml', 'aws_session_token', token.credentials.session_token)
+    config.set(profile, 'output', outputformat)
+    config.set(profile, 'region', region)
+    # Just makes it easier to tell them appart when looking in the file
+    config.set(profile, 'aws_role_arn', role_arn)
+    config.set(profile, 'aws_access_key_id', token.credentials.access_key)
+    config.set(profile, 'aws_secret_access_key', token.credentials.secret_key)
+    config.set(profile, 'aws_session_token', token.credentials.session_token)
 
     # Write the updated config file
     with open(filename, 'w+') as configfile:
         config.write(configfile)
-
-    expires_utc = token.credentials.expiration
-
-    # Give the user some basic info as to what has just happened
-    print '\n\n----------------------------------------------------------------'
-    print 'Your new access key pair has been stored in the AWS configuration file {0} under the saml profile.'.format(filename)
-    print 'Note that it will expire at {0}.'.format(expires_utc)
-    print 'After this time you may safely rerun this script to refresh your access key pair.'
-    print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances).'
-    print '----------------------------------------------------------------\n\n'
-
 
 ##########################################################################
 def main():
