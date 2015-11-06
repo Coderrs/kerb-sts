@@ -171,6 +171,7 @@ def bind_assertion_to_role(assertion, role, profile):
     config.set(profile, 'aws_access_key_id', token.credentials.access_key)
     config.set(profile, 'aws_secret_access_key', token.credentials.secret_key)
     config.set(profile, 'aws_session_token', token.credentials.session_token)
+    config.set(profile, 'aws_session_expires_utc', token.credentials.expiration)
 
     # Write the updated config file
     with open(filename, 'w+') as configfile:
