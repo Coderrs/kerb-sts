@@ -40,18 +40,22 @@ def do_kinit():
     return_var = commands.getstatusoutput(kinit)
     return return_var
 
-def handle_sts_by_kerberos():
+def handle_sts_by_ntlm():
     # Initiate session handler
     session = requests.Session()
 
+    print "Username as <domain>\<username>:",
+    username = raw_input()
+    password = getpass.getpass()
+    print ''
+    session.auth = HttpNtlmAuth(username, password, session)
     # Programatically get the SAML assertion
     headers = {'User-Agent': 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'}
-    response = session.get(idpentryurl, verify=sslverification, headers=headers, auth=HTTPKerberosAuth(mutual_authentication=OPTIONAL))
+    response = session.get(idpentryurl, verify=sslverification, headers=headers)
 
-    # Debug the response if needed
+    handle_sts_from_response(response)
 
-
-    # Decode the response and extract the SAML assertion
+def handle_sts_from_response(response):
     soup = BeautifulSoup(response.text.decode('utf8'), "html.parser")
     assertion = ''
 
@@ -143,6 +147,16 @@ def handle_sts_by_kerberos():
     print '----------------------------------------------------------------\n\n'
 
 
+def handle_sts_by_kerberos():
+    # Initiate session handler
+    session = requests.Session()
+
+    # Programatically get the SAML assertion
+    headers = {'User-Agent': 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'}
+    response = session.get(idpentryurl, verify=sslverification, headers=headers, auth=HTTPKerberosAuth(mutual_authentication=OPTIONAL))
+    handle_sts_from_response(response)
+
+
 ##########################################################################
 # Variables
 
@@ -173,12 +187,13 @@ def main():
         print "It looks like you have a valid Windows/Kerberos Session. This should 'Just Work™'."
         handle_sts_by_kerberos()
     else:
-        print "I did not find a valid Kerberos Token/Cache. Ahhh 💩"
+        print "No valid Kerberos Token/Cache found. Ahhh 💩"
         print "Maybe we can create one... hang on"
         kinit_result = do_kinit()
         if kinit_result[0] == 0:
             handle_sts_by_kerberos()
         else:
             print kinit_result[1]
-
+            print "Ehh, sorry but that still didn't work. Bear with me while we go old school. 🚌"
+            handle_sts_by_ntlm()
 main()
