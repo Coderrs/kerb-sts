@@ -22,7 +22,7 @@ when required.
 ### Prerequisites
 0. Install python - The script has been tested with the default instal of 2.7 on OSX
 1. Install pip - $ sudo easy_install pip
-2. Install required packages - $ sudo -H pip install -U boto beautifulsoup4 requests-ntlm requests-ntlm requests-kerberos python-krbV
+2. Install required packages - $ sudo -H pip install -U boto beautifulsoup4 requests-ntlm requests-ntlm requests-kerberos
 3. Install aws cli -  $ sudo -H pip install -U awscli
 4. Create default aws credential file - $ mkdir ~/.aws && cp credentials.sample ~/.aws/credentials
 5. Update ~/.bash_profile - $ echo 'export PYTHONPATH="/Library/Python/2.7/site-packages:$PYTHONPATH"' >> ~/.bash_profile && source ~/.bash_profile

@@ -11,7 +11,7 @@ import ConfigParser
 import base64
 import xml.etree.ElementTree as ET
 import requests
-import krbV
+import os.path
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 from bs4 import BeautifulSoup
 from os.path import expanduser
@@ -21,75 +21,53 @@ from requests_ntlm import HttpNtlmAuth
 
 ##########################################################################
 # Variables
-
-# region: The default AWS region that this script will connect
-# to for all API calls
-region = 'us-east-1'
-
+config_filename = ''
+site_config_filename = ''
+idpentryurl = ''
 # output format: The AWS CLI output format that will be configured in the
 # saml profile (affects subsequent CLI calls)
 outputformat = 'json'
-
-# awsconfigfile: The file where this script will store the temp
-# credentials under the saml profile
-awsconfigfile = '/.aws/credentials'
 
 # SSL certificate verification: Whether or not strict certificate
 # verification is done, False should only be used for dev/test
 sslverification = True
 
-# idpentryurl: The initial URL that starts the authentication process.
-idpentryurl = 'https://adfs.commercehub.com/adfs/ls/IdpInitiatedSignOn.aspx?loginToRp=urn:amazon:webservices'
 
-def has_ticket():
-    '''
-    Checks to see if the user has a valid ticket.
-    '''
-    ctx = krbV.default_context()
-    cc = ctx.default_ccache()
-    try:
-        princ = cc.principal()
-        retval = True
-    except krbV.Krb5Error:
-        retval = False
 
-    return retval
 
 def do_kinit():
-    # Get the federated credentials from the user
-    kinit = 'kinit'
-    print "Enter Your Password"
-    return_var = commands.getstatusoutput(kinit)
-    return return_var
+    print "WARN: There was no Kerberos cache or ticket available."
+    print "WARN: Try running 'kinit' before running this script again"
+    print "WARN: Hit Ctrl-c if you want to try kinit now"
 
 def handle_sts_by_ntlm():
-    # Initiate session handler
     session = requests.Session()
-
     print "Username as <domain>\<username>:",
     username = raw_input()
     password = getpass.getpass()
     print ''
     session.auth = HttpNtlmAuth(username, password, session)
-    # Programatically get the SAML assertion
+    # A hack added for ADFS 3.0
     headers = {'User-Agent': 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'}
     response = session.get(idpentryurl, verify=sslverification, headers=headers)
 
     handle_sts_from_response(response)
 
 def handle_sts_by_kerberos():
-    # Initiate session handler
+
     session = requests.Session()
-    # Programatically get the SAML assertion
+    # A hack added for ADFS 3.0
     headers = {'User-Agent': 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'}
     response = session.get(idpentryurl, verify=sslverification, headers=headers, auth=HTTPKerberosAuth(mutual_authentication=OPTIONAL))
-    handle_sts_from_response(response)
-
+    if response.status_code == requests.codes.ok:
+        handle_sts_from_response(response)
+    else:
+        do_kinit()
+        handle_sts_by_ntlm()
 
 def handle_sts_from_response(response):
     soup = BeautifulSoup(response.text.decode('utf8'), "html.parser")
     assertion = ''
-
     # Look for the SAMLResponse attribute of the input tag (determined by
     # analyzing the debug print lines above)
     for inputtag in soup.find_all('input'):
@@ -99,6 +77,7 @@ def handle_sts_from_response(response):
 
     # Parse the returned assertion and extract the authorized roles
     awsroles = []
+    #print '>'+assertion+'<'
     root = ET.fromstring(base64.b64decode(assertion))
 
     for saml2attribute in root.iter('{urn:oasis:names:tc:SAML:2.0:assertion}Attribute'):
@@ -129,35 +108,40 @@ def handle_sts_from_response(response):
             print '[', profile, ']: ', awsrole.split(',')[0]
             expires_utc = bind_assertion_to_role(assertion, awsrole, profile).credentials.expiration
             i += 1
-        print '\n\n----------------------------------------------------------------'
-        print 'Your new access key pairs have been stored in the AWS configuration file {0} under the saml-<i> profiles.'.format(expanduser("~") + awsconfigfile)
+        print '----------------------------------------------------------------'
+        print 'Your new access key pairs have been stored in the AWS configuration'
+        print 'file {0} under the saml-<i> profiles.'.format(config_filename)
         print 'Note they will expire at {0}.'.format(expires_utc)
         print 'After this time you may safely rerun this script to refresh your access key pair.'
-        print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml-0 ec2 describe-instances).'
-        print '----------------------------------------------------------------\n\n'
+        print 'To use this credential call the AWS CLI with the --profile option'
+        print 'e.g. aws --profile saml-0 ec2 describe-instances.'
+        print '----------------------------------------------------------------'
 
     else:
         bind_assertion_to_role(assertion, awsroles[0], 'saml')
-        print '\n\n----------------------------------------------------------------'
-        print 'Your new access key pair has been stored in the AWS configuration file {0} under the saml profile.'.format(expanduser("~") + awsconfigfile)
+        print '----------------------------------------------------------------'
+        print 'Your new access key pair has been stored in the AWS configuration '
+        print 'file {0} under the saml profile.'.format(expanduser("~") + config_filename)
         print 'Note that it will expire in 1 hour'
         print 'After this time you may safely rerun this script to refresh your access key pair.'
-        print 'To use this credential call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances).'
-        print '----------------------------------------------------------------\n\n'
+        print 'To use this credential call the AWS CLI with the --profile option '
+        print 'e.g. aws --profile saml-0 ec2 describe-instances.'
+        print '----------------------------------------------------------------'
 
 
 def bind_assertion_to_role(assertion, role, profile):
+
+    config = ConfigParser.RawConfigParser()
+    config.read(config_filename)
+    region = config.get('default','region')
     conn = boto.sts.connect_to_region(region)
     role_arn = role.split(',')[0]
     principal_arn = role.split(',')[1]
     token = conn.assume_role_with_saml(role_arn, principal_arn, assertion)
     # Write the AWS STS token into the AWS credential file
-    home = expanduser("~")
-    filename = home + awsconfigfile
-
     # Read in the existing config file
     config = ConfigParser.RawConfigParser()
-    config.read(filename)
+    config.read(config_filename)
 
     # Put the credentials into a specific profile instead of clobbering
     # the default credentials
@@ -165,7 +149,7 @@ def bind_assertion_to_role(assertion, role, profile):
         config.add_section(profile)
 
     config.set(profile, 'output', outputformat)
-    config.set(profile, 'region', region)
+    #config.set(profile, 'region', region)
     # Just makes it easier to tell them appart when looking in the file
     config.set(profile, 'aws_role_arn', role_arn)
     config.set(profile, 'aws_access_key_id', token.credentials.access_key)
@@ -174,29 +158,72 @@ def bind_assertion_to_role(assertion, role, profile):
     config.set(profile, 'aws_session_expires_utc', token.credentials.expiration)
 
     # Write the updated config file
-    with open(filename, 'w+') as configfile:
+    with open(config_filename, 'w+') as configfile:
         config.write(configfile)
     return token
 
+def verify_default_credential_file(filename):
+    if not os.path.isfile(filename):
+        if not(os.path.exists(os.path.dirname(filename))):
+            os.makedirs(os.path.dirname(filename))
+        with open(filename, 'a') as the_file:
+            the_file.write('[default]\n')
+        config = ConfigParser.RawConfigParser()
+        config.read(filename)
+        #if not config.has_section('default'):
+        config.set('default', 'output', 'json')
+        config.set('default', 'region', 'us-east-1')
+        config.set('default', 'aws_access_key_id', '')
+        config.set('default', 'aws_secret_access_key', '')
+        with open(filename, 'w+') as configfile:
+            config.write(configfile)
+        print "New credential file created - " + filename
+
+def verify_local_site_file(filename):
+    if not os.path.isfile(filename):
+        if not(os.path.exists(os.path.dirname(filename))):
+            os.makedirs(os.path.dirname(filename))
+        with open(filename, 'a') as the_file:
+            the_file.write('[default]\n')
+
+        print "INTIAL CONFIGURATION NEEDED",
+        print "Please enter the domain name of your ADFS server [adfs.yoursite.com]",
+        adfs_domain = raw_input()
+        config = ConfigParser.RawConfigParser()
+        config.read(filename)
+
+        config.set('default', 'idp_url', 'https://'+adfs_domain+'/adfs/ls/IdpInitiatedSignOn.aspx?loginToRp=urn:amazon:webservices')
+        with open(filename, 'w+') as configfile:
+            config.write(configfile)
+        print "New site configuration file created - " + filename
+
+    site_config = ConfigParser.RawConfigParser()
+    site_config.read(filename)
+
+    global idpentryurl
+    idpentryurl = site_config.get('default', 'idp_url')
+
+
+def verify_defaults():
+    awsconfigfile = '/.aws/credentials'
+    home = expanduser("~")
+    filename = home + awsconfigfile
+    verify_default_credential_file(filename)
+    site_filename = home + '/.aws/localsite'
+    verify_local_site_file(site_filename)
+
+    global config_filename
+    config_filename = filename
+    global site_config_filename
+    site_config_filename = site_filename
+
+
 ##########################################################################
 def main():
-    # Get the federated credentials from the user
-    hasTicket = has_ticket()
-    if hasTicket == True:
-        print "It looks like you have a valid Windows/Kerberos Session. This should 'Just Work™'."
+    verify_defaults()
+    try:
         handle_sts_by_kerberos()
-    else:
-        print "No valid Kerberos Token/Cache found. Ahhh 💩"
-        print "Maybe we can create one... hang on"
-        kinit_result = do_kinit()
-        if kinit_result[0] == 0:
-            handle_sts_by_kerberos()
-        else:
-            print kinit_result[1]
-            print "Ehh, sorry but that still didn't work. Bear with me while we go old school. 🚌"
-            try:
-                handle_sts_by_ntlm()
-            except:
-                print "All hope is lost. I hope your problem is something simple like being off network, but I don't know 😕"
-                raise
+    except:
+        print "Something unexpected happened. Maybe you are off network?"
+        raise
 main()
