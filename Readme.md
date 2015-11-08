@@ -17,15 +17,19 @@ when required.
 
 
 ## Installation
-*This script has not been tested on Windows or Linux*
+*This script has not been tested onLinux*
 
-### Prerequisites
+### OSX
 0. Install python - The script has been tested with the default instal of 2.7 on OSX
 1. Install pip - $ sudo easy_install pip
 2. Install required packages - $ sudo -H pip install -U boto beautifulsoup4 requests-ntlm requests-ntlm requests-kerberos
 3. Install aws cli -  $ sudo -H pip install -U awscli
-4. Create default aws credential file - $ mkdir ~/.aws && cp credentials.sample ~/.aws/credentials
 5. Update ~/.bash_profile - $ echo 'export PYTHONPATH="/Library/Python/2.7/site-packages:$PYTHONPATH"' >> ~/.bash_profile && source ~/.bash_profile
+6. Add to your search $PATH - $ ln -s ./sts-init.py /usr/local/bin/sts-init
 
-### Add to your search $PATH
-$ ln -s ./sts-init.py /usr/local/bin/sts-init
+### Windows
+0. Install python - Tested with 2.7.x. Not tested with 3.x but feel free to try it.
+1. Ensure python and python/scripts are on the PATH
+2. Install required packages - pip install -U boto beautifulsoup4 requests-ntlm requests-ntlm
+3. Install requests-kerberos from this repo - cd to requests-kerberos and type 'pip install --replace'
+4. Install the aws cli - You need the MSI directly from amazon
