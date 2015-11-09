@@ -30,6 +30,8 @@ when required.
 6. Add to your search $PATH - $ ln -s ./sts-init.py /usr/local/bin/sts-init
 
 ### Windows
+*The currently released version (0.7) of requests-kerberos does not correctly support Win32.
+This repo includes a recently merged changeset which includes the necessary fix.*
 
 0. Install python - Tested with 2.7.x. Not tested with 3.x but feel free to try it.
 1. Ensure python and python/scripts are on the PATH
