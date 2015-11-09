@@ -1,5 +1,6 @@
 # AWS CLI Kerberos Adapter
 
+Based on the ADSF-CLI script  [originally posted by Quint Van Deman] (https://blogs.aws.amazon.com/security/post/Tx1LDN0UBGJJ26Q/How-to-Implement-Federated-API-and-CLI-Access-Using-SAML-2-0-and-AD-FS)
 ## Overview
 This script provides a seamless mechanism for federating the AWS CLI. When
 properly configured this script allows a user to get a short lived set of
@@ -29,6 +30,7 @@ when required.
 6. Add to your search $PATH - $ ln -s ./sts-init.py /usr/local/bin/sts-init
 
 ### Windows
+
 0. Install python - Tested with 2.7.x. Not tested with 3.x but feel free to try it.
 1. Ensure python and python/scripts are on the PATH
 2. Install required packages - pip install -U boto beautifulsoup4 requests-ntlm requests-ntlm
@@ -48,7 +50,7 @@ when required.
 
 ## Configuration
 
-The script attempts to create default configurations if none are found. 
+The script attempts to create default configurations if none are found.
 
 ### Credential File
 The AWS default location for the credential file is ~/.aws. For this script to work there
@@ -57,7 +59,7 @@ up. If an existing file is malformed, please remove it.
 
 ### Localsite file
 This script creats an additional configuration file, ~/.aws/localsite. This file
-contains any custom configurations such as the location of the ADFS server. At 
+contains any custom configurations such as the location of the ADFS server. At
 startup you will be asked for the domain of the adfs server. There is no validation
-of the input value and you will not be prompted again to provide a value. Remove 
+of the input value and you will not be prompted again to provide a value. Remove
 this file if you need to be prompted again for a new value.
