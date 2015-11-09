@@ -17,6 +17,7 @@ when required.
 
 ## Installation
 * *Note: This script has not been tested on Linux*
+* *Note: Python 2.7.10 is the minimal version supported*
 
 ### OSX
 0. Install python - The script has been tested with the default instal of 2.7 on OSX
