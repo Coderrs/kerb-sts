@@ -8,16 +8,15 @@ credentials for each authorized role.
 The script leverages Kerberos and ADFS to avoid any need for the user to enter
 a AD domain password or provide AWS credentials. The script gracefully degrades
 as follows
-* If there is no current kerberos cache, the user is prompted for a password
-* If kerberos is not available the user is prompted for a username, password pair
+* If kerberod auth fails, we fallback to NTLM username/password prompt
+* The user may opt to Ctrl-C the script and initialized a kerberos session instead
 
-This script does not work if the user of not on a corporate network or VPN.
+This script does not work if the user is not on a corporate network or VPN.
 It would be highly desirable to support off network access via a SecurID prompt
 when required.
 
-
 ## Installation
-*This script has not been tested onLinux*
+* *Note: This script has not been tested on Linux*
 
 ### OSX
 0. Install python - The script has been tested with the default instal of 2.7 on OSX
@@ -33,3 +32,30 @@ when required.
 2. Install required packages - pip install -U boto beautifulsoup4 requests-ntlm requests-ntlm
 3. Install requests-kerberos from this repo - cd to requests-kerberos and type 'pip install --replace'
 4. Install the aws cli - You need the MSI directly from amazon
+
+## Usage
+#### OSX
+```
+  $ sts-init
+```
+
+#### Windows
+```
+  C\:> python /location/of/script/sts-init.py
+```
+
+## Configuration
+
+The script attempts to create default configurations if none are found. 
+
+### Credential File
+The AWS default location for the credential file is ~/.aws. For this script to work there
+must be a minimal file in place. The script attempts to creste this file at start
+up. If an existing file is malformed, please remove it.
+
+### Localsite file
+This script creats an additional configuration file, ~/.aws/localsite. This file
+contains any custom configurations such as the location of the ADFS server. At 
+startup you will be asked for the domain of the adfs server. There is no validation
+of the input value and you will not be prompted again to provide a value. Remove 
+this file if you need to be prompted again for a new value.
