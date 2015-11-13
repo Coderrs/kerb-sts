@@ -65,22 +65,26 @@ def handle_sts_by_kerberos():
     else:
         do_kinit()
         handle_sts_by_ntlm()
+def arn_to_string(arn):
+    return "ARN."+arn.replace(":", ".")
 
 def get_profile_name(aws_role, default_profile_name):
 
+    #print_aws_role(aws_role)
     site_config = ConfigParser.RawConfigParser()
     site_config.read(site_config_filename)
-    role_arn = aws_role.split(',')[0]
-    if site_config.get('default', role_arn) != null :
+    role_arn = arn_to_string(aws_role.split(',')[0])
+    if site_config.has_option('default', role_arn) :
         return site_config.get('default', role_arn)
     else:
-        print "Please provide a profile label for '"+role_arn+"' ["+default_profile_name+"]",
-        profile_name = raw_input() || default_profile_name # TODO ensure this if blank method works
-        if site_config.has('default', profile_name):
-            # TODO I am sure this not how you raise an error in Python
-            raise "This profile is already in use. Remove it from " + site_config_filename + " if you wish to reuse it"
+        print "Please provide a profile label for '"+aws_role.split(',')[0]+"' ["+default_profile_name+"]",
+        profile_name = raw_input().strip()# || default_profile_name # TODO ensure this if blank method works
+        profile_name = profile_name if len(profile_name)>0 else default_profile_name
+        # Check to see if this value exists for another key
+        if len([item for item in site_config.items('default') if item[1]==profile_name]) != 0:
+            raise ValueError( "This profile is already in use. Remove it from " + site_config_filename + " if you wish to reuse it" )
         # TODO raise an error if the profile is an invalid (unusable value)
-        site_config.put('default', role_arn, profile_name)
+        site_config.set('default', role_arn, profile_name)
         flush_config_to_file(site_config, site_config_filename)
         return profile_name
 
@@ -126,12 +130,12 @@ def handle_sts_from_response(response):
         i = 0
         print "NOTE: You have multiple roles - a profile will be created for each"
         expires_utc = 0
-
+        profile = 'saml'
         for awsrole in awsroles:
 
 
             profile ='saml-'+ str(i)
-            profile = get_profile_name(aws_role, profile)
+            profile = get_profile_name(awsrole, profile)
             print '[', profile, ']: ', awsrole.split(',')[0]
 
             expires_utc = bind_assertion_to_role(assertion, awsrole, profile).credentials.expiration
@@ -142,18 +146,18 @@ def handle_sts_from_response(response):
         print 'Note they will expire at {0}.'.format(expires_utc)
         print 'After this time you may safely rerun this script to refresh your access key pair.'
         print 'To use this credential call the AWS CLI with the --profile option'
-        print 'e.g. aws --profile saml-0 ec2 describe-instances.'
+        print 'e.g. aws --profile '+profile+' ec2 describe-instances.'
         print '----------------------------------------------------------------'
 
     else:
-        bind_assertion_to_role(assertion, awsroles[0], 'saml')
+        bind_assertion_to_role(assertion, awsroles[0], 'default')
         print '----------------------------------------------------------------'
         print 'Your new access key pair has been stored in the AWS configuration '
         print 'file {0} under the saml profile.'.format(expanduser("~") + config_filename)
         print 'Note that it will expire in 1 hour'
         print 'After this time you may safely rerun this script to refresh your access key pair.'
-        print 'To use this credential call the AWS CLI with the --profile option '
-        print 'e.g. aws --profile saml-0 ec2 describe-instances.'
+        print 'To use this credential call the AWS CLI without the --profile option '
+        print 'e.g. aws ec2 describe-instances.'
         print '----------------------------------------------------------------'
 
 
@@ -231,10 +235,12 @@ def verify_local_site_file(filename):
     idpentryurl = site_config.get('default', 'idp_url')
 
 def print_aws_role(aws_role):
-    split = aws_role.split(',')
+    splits = aws_role.split(',')
+    i = 1
     for split in splits :
-        print split
-    
+        print str(i) + " - " + split
+        i+=1
+
 def verify_defaults():
     awsconfigfile = '/.aws/credentials'
     home = expanduser("~")
