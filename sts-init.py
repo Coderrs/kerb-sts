@@ -67,8 +67,26 @@ def handle_sts_by_kerberos():
         handle_sts_by_ntlm()
 
 def get_profile_name(aws_role, default_profile_name):
-    return default_profile_name
 
+    site_config = ConfigParser.RawConfigParser()
+    site_config.read(site_config_filename)
+    role_arn = aws_role.split(',')[0]
+    if site_config.get('default', role_arn) != null :
+        return site_config.get('default', role_arn)
+    else:
+        print "Please provide a profile label for '"+role_arn+"' ["+default_profile_name+"]",
+        profile_name = raw_input() || default_profile_name # TODO ensure this if blank method works
+        if site_config.has('default', profile_name):
+            # TODO I am sure this not how you raise an error in Python
+            raise "This profile is already in use. Remove it from " + site_config_filename + " if you wish to reuse it"
+        # TODO raise an error if the profile is an invalid (unusable value)
+        site_config.put('default', role_arn, profile_name)
+        flush_config_to_file(site_config, site_config_filename)
+        return profile_name
+
+def flush_config_to_file(config, file):
+    with open(file, 'w+') as configfile:
+        config.write(configfile)
 
 def handle_sts_from_response(response):
     soup = BeautifulSoup(response.text.decode('utf8'), "html.parser")
@@ -112,7 +130,7 @@ def handle_sts_from_response(response):
         for awsrole in awsroles:
 
 
-            profile ='saml-'+ str(i)            
+            profile ='saml-'+ str(i)
             profile = get_profile_name(aws_role, profile)
             print '[', profile, ']: ', awsrole.split(',')[0]
 
@@ -168,8 +186,7 @@ def bind_assertion_to_role(assertion, role, profile):
     config.set(profile, 'aws_session_expires_utc', token.credentials.expiration)
 
     # Write the updated config file
-    with open(config_filename, 'w+') as configfile:
-        config.write(configfile)
+    flush_config_to_file(config, config_filename)
     return token
 
 def verify_default_credential_file(filename):
@@ -213,7 +230,11 @@ def verify_local_site_file(filename):
     global idpentryurl
     idpentryurl = site_config.get('default', 'idp_url')
 
-
+def print_aws_role(aws_role):
+    split = aws_role.split(',')
+    for split in splits :
+        print split
+    
 def verify_defaults():
     awsconfigfile = '/.aws/credentials'
     home = expanduser("~")
