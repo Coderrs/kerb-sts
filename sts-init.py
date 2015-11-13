@@ -24,6 +24,7 @@ from requests_ntlm import HttpNtlmAuth
 config_filename = ''
 site_config_filename = ''
 idpentryurl = ''
+
 # output format: The AWS CLI output format that will be configured in the
 # saml profile (affects subsequent CLI calls)
 outputformat = 'json'
@@ -65,6 +66,10 @@ def handle_sts_by_kerberos():
         do_kinit()
         handle_sts_by_ntlm()
 
+def get_profile_name(aws_role, default_profile_name):
+    return default_profile_name
+
+
 def handle_sts_from_response(response):
     soup = BeautifulSoup(response.text.decode('utf8'), "html.parser")
     assertion = ''
@@ -103,9 +108,14 @@ def handle_sts_from_response(response):
         i = 0
         print "NOTE: You have multiple roles - a profile will be created for each"
         expires_utc = 0
+
         for awsrole in awsroles:
-            profile ='saml-'+ str(i)
+
+
+            profile ='saml-'+ str(i)            
+            profile = get_profile_name(aws_role, profile)
             print '[', profile, ']: ', awsrole.split(',')[0]
+
             expires_utc = bind_assertion_to_role(assertion, awsrole, profile).credentials.expiration
             i += 1
         print '----------------------------------------------------------------'
