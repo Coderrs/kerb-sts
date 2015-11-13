@@ -1,6 +1,7 @@
 # AWS CLI Kerberos Adapter
 
 Based on the ADSF-CLI script  [originally posted by Quint Van Deman] (https://blogs.aws.amazon.com/security/post/Tx1LDN0UBGJJ26Q/How-to-Implement-Federated-API-and-CLI-Access-Using-SAML-2-0-and-AD-FS)
+
 ## Overview
 This script provides a seamless mechanism for federating the AWS CLI. When
 properly configured this script allows a user to get a short lived set of
@@ -9,12 +10,13 @@ credentials for each authorized role.
 The script leverages Kerberos and ADFS to avoid any need for the user to enter
 a AD domain password or provide AWS credentials. The script gracefully degrades
 as follows
-* If kerberod auth fails, we fallback to NTLM username/password prompt
+* If kerberos auth fails, we fallback to NTLM username/password prompt
 * The user may opt to Ctrl-C the script and initialized a kerberos session instead
 
-This script does not work if the user is not on a corporate network or VPN.
-It would be highly desirable to support off network access via a SecurID prompt
-when required.
+This script does not work if the user is not on a corporate network or VPN when such
+conditions cause ADFS to not work or to prompt for 2FA.
+It would be highly desirable to support off network access via a SecurID or other
+2FA solutions when encountered.
 
 ## Installation
 * *Note: This script has not been tested on Linux*
@@ -41,13 +43,13 @@ This repo includes a recently merged changeset which includes the [necessary fix
 
 ## Usage
 #### OSX
-```
+```shell
   $ sts-init
 ```
 
 #### Windows
-```
-  C\:> python /location/of/script/sts-init.py
+```shell
+  C\:> python \location\of\script\sts-init.py
 ```
 
 ## Configuration
@@ -56,12 +58,12 @@ The script attempts to create default configurations if none are found.
 
 ### Credential File
 The AWS default location for the credential file is ~/.aws. For this script to work there
-must be a minimal file in place. The script attempts to creste this file at start
+must be a minimal file in place. The script attempts to create this file at start
 up. If an existing file is malformed, please remove it.
 
 ### Localsite file
-This script creats an additional configuration file, ~/.aws/localsite. This file
+This script creates an additional configuration file, ~/.aws/localsite. This file
 contains any custom configurations such as the location of the ADFS server. At
-startup you will be asked for the domain of the adfs server. There is no validation
+startup you will be asked for the domain of the ADFS server. There is no validation
 of the input value and you will not be prompted again to provide a value. Remove
 this file if you need to be prompted again for a new value.
