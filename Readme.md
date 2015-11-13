@@ -54,7 +54,7 @@ This repo includes a recently merged changeset which includes the [necessary fix
 
 ## Configuration
 
-The script attempts to create default configurations if none are found.
+The script creates default configurations if none are found.
 
 ### Credential File
 The AWS default location for the credential file is ~/.aws. For this script to work there
@@ -67,3 +67,6 @@ contains any custom configurations such as the location of the ADFS server. At
 startup you will be asked for the domain of the ADFS server. There is no validation
 of the input value and you will not be prompted again to provide a value. Remove
 this file if you need to be prompted again for a new value.
+
+The localsite file is used to store the ARN to nickname mapping used to determine
+what section to add the credentials to in the credential file.
